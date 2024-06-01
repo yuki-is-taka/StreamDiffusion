@@ -10,9 +10,9 @@ def list_files_in_folder(hf_home):
         folders = [folder.replace('models--', '').replace('--', '/') for folder in os.listdir(hf_home) if os.path.isdir(os.path.join(hf_home, folder))]
         return folders
 
-def stream_engine(width, height, steps, acceleration, model):
+def stream_engine(width, height, steps, acceleration, model, provided_model):
 
-    #model_id_or_path = provided_model if provided_model else model
+    model_id_or_path = provided_model if provided_model else model
 
     # Determine acceleration method
     use_lcm_lora = acceleration == 'LCM'
@@ -24,7 +24,7 @@ def stream_engine(width, height, steps, acceleration, model):
     engine_dir = f'{parent_dir}/engines'
 
     stream = StreamDiffusionWrapper(
-        model_id_or_path=model,
+        model_id_or_path=model_id_or_path,
         lora_dict=None,
         t_index_list=t_index_list,
         frame_buffer_size=1,
@@ -66,7 +66,7 @@ def stream_engine(width, height, steps, acceleration, model):
         if elapsed_time != 0:
             fps = 1 / elapsed_time
 
-    return f"""Model: {model}\nWxH: {width}x{height}\nBatch size: {steps}\nExpected: {int(fps)} FPS\nStatus: Ready"""
+    return f"""Model: {model_id_or_path}\nWxH: {width}x{height}\nBatch size: {steps}\nExpected: {int(fps)} FPS\nStatus: Ready"""
 
 
 current_directory = os.getcwd()
@@ -84,7 +84,7 @@ demo = gr.Interface(
         gr.Slider(1, 20, value=1, step = 1, label='Sampling steps (Batch size)'),
         gr.Radio(["None", "Turbo", "LCM"], label='Acceleration'),
         gr.Dropdown(models, label=f"Select model from {hf_home}"),
-        #gr.Textbox(label=f"Or provide model name or path")
+        gr.Textbox(label=f"Or provide model name")
      
     ],
     "text",
