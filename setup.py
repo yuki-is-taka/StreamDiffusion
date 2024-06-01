@@ -3,10 +3,8 @@ import re
 
 from setuptools import find_packages, setup
 
-
 _deps = [
     "torch",
-    "xformers",
     "diffusers==0.24.0",
     "transformers",
     "accelerate",
@@ -17,6 +15,7 @@ _deps = [
     "onnxruntime==1.16.3",
     "protobuf==3.20.2",
     "colored",
+    "gradio",
     "pywin32;sys_platform == 'win32'"
 ]
 
@@ -28,18 +27,15 @@ def deps_list(*pkgs):
 
 
 extras = {}
-extras["xformers"] = deps_list("xformers")
-extras["torch"] = deps_list("torch", "accelerate")
+extras["torch"] = deps_list("torch")
 extras["tensorrt"] = deps_list("protobuf", "cuda-python", "onnx", "onnxruntime", "colored")
 
-extras["dev"] = extras["xformers"] + extras["torch"] + extras["tensorrt"]
+extras["dev"] = extras["torch"] + extras["tensorrt"]
 
 install_requires = [
     deps["fire"],
     deps["omegaconf"],
-    deps["diffusers"],
-    deps["transformers"],
-    deps["accelerate"],
+    deps['gradio']
 ]
 
 setup(

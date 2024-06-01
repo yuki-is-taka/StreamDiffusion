@@ -27,7 +27,7 @@ import onnx
 import onnx_graphsurgeon as gs
 import tensorrt as trt
 import torch
-from cuda import cudart
+#from cuda import cudart
 from PIL import Image
 from polygraphy import cuda
 from polygraphy.backend.common import bytes_from_path
@@ -68,15 +68,15 @@ else:
 torch_to_numpy_dtype_dict = {value: key for (key, value) in numpy_to_torch_dtype_dict.items()}
 
 
-def CUASSERT(cuda_ret):
-    err = cuda_ret[0]
-    if err != cudart.cudaError_t.cudaSuccess:
-        raise RuntimeError(
-            f"CUDA ERROR: {err}, error code reference: https://nvidia.github.io/cuda-python/module/cudart.html#cuda.cudart.cudaError_t"
-        )
-    if len(cuda_ret) > 1:
-        return cuda_ret[1]
-    return None
+# def CUASSERT(cuda_ret):
+#     err = cuda_ret[0]
+#     if err != cudart.cudaError_t.cudaSuccess:
+#         raise RuntimeError(
+#             f"CUDA ERROR: {err}, error code reference: https://nvidia.github.io/cuda-python/module/cudart.html#cuda.cudart.cudaError_t"
+#         )
+#     if len(cuda_ret) > 1:
+#         return cuda_ret[1]
+#     return None
 
 
 class Engine:
@@ -266,21 +266,22 @@ class Engine:
             self.context.set_tensor_address(name, tensor.data_ptr())
 
         if use_cuda_graph:
-            if self.cuda_graph_instance is not None:
-                CUASSERT(cudart.cudaGraphLaunch(self.cuda_graph_instance, stream.ptr))
-                CUASSERT(cudart.cudaStreamSynchronize(stream.ptr))
-            else:
-                # do inference before CUDA graph capture
-                noerror = self.context.execute_async_v3(stream.ptr)
-                if not noerror:
-                    raise ValueError("ERROR: inference failed.")
-                # capture cuda graph
-                CUASSERT(
-                    cudart.cudaStreamBeginCapture(stream.ptr, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
-                )
-                self.context.execute_async_v3(stream.ptr)
-                self.graph = CUASSERT(cudart.cudaStreamEndCapture(stream.ptr))
-                self.cuda_graph_instance = CUASSERT(cudart.cudaGraphInstantiate(self.graph, 0))
+            pass
+            # if self.cuda_graph_instance is not None:
+            #     CUASSERT(cudart.cudaGraphLaunch(self.cuda_graph_instance, stream.ptr))
+            #     CUASSERT(cudart.cudaStreamSynchronize(stream.ptr))
+            # else:
+            #     # do inference before CUDA graph capture
+            #     noerror = self.context.execute_async_v3(stream.ptr)
+            #     if not noerror:
+            #         raise ValueError("ERROR: inference failed.")
+            #     # capture cuda graph
+            #     CUASSERT(
+            #         cudart.cudaStreamBeginCapture(stream.ptr, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
+            #     )
+            #     self.context.execute_async_v3(stream.ptr)
+            #     self.graph = CUASSERT(cudart.cudaStreamEndCapture(stream.ptr))
+            #     self.cuda_graph_instance = CUASSERT(cudart.cudaGraphInstantiate(self.graph, 0))
         else:
             noerror = self.context.execute_async_v3(stream.ptr)
             if not noerror:
@@ -289,11 +290,11 @@ class Engine:
         return self.tensors
 
 
-def decode_images(images: torch.Tensor):
-    images = (
-        ((images + 1) * 255 / 2).clamp(0, 255).detach().permute(0, 2, 3, 1).round().type(torch.uint8).cpu().numpy()
-    )
-    return [Image.fromarray(x) for x in images]
+# def decode_images(images: torch.Tensor):
+#     images = (
+#         ((images + 1) * 255 / 2).clamp(0, 255).detach().permute(0, 2, 3, 1).round().type(torch.uint8).cpu().numpy()
+#     )
+#     return [Image.fromarray(x) for x in images]
 
 
 def preprocess_image(image: Image.Image):
@@ -375,7 +376,9 @@ def build_engine(
     build_all_tactics: bool = False,
     build_enable_refit: bool = False,
 ):
-    _, free_mem, _ = cudart.cudaMemGetInfo()
+    #_, free_mem, _ = cudart.cudaMemGetInfo()
+    device = torch.device("cuda")
+    free_mem = torch.cuda.get_device_properties(device).total_memory - torch.cuda.memory_allocated(device)
     GiB = 2**30
     if free_mem > 6 * GiB:
         activation_carveout = 4 * GiB
