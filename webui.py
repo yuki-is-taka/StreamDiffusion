@@ -109,10 +109,10 @@ def inst_upd():
         pass
 
     try:
-        subprocess.check_call(["pip", "install", "torch==2.2.2", "torchvision==0.17.2", "torchaudio==2.2.2", "--index-url", "https://download.pytorch.org/whl/cu118"])
+        subprocess.check_call(["pip", "install", "torch==2.1.0", "torchvision==0.16.0", "--index-url", "https://download.pytorch.org/whl/cu118"])
     except Exception as e:
         print(f"An unexpected error occurred while executing the command: {e}")
-        error_packages.append('torch==2.2.2')
+        error_packages.append('torch==2.1.0')
 
     for package in packages:
         try:
