@@ -103,11 +103,15 @@ class StreamDiffusion:
         **kwargs,
 
     ) -> None:
+        #kwargs = {"local_files_only": False, "weight_name": "pytorch_lora_weights.safetensors"} 
         self.pipe.load_lora_weights(
             pretrained_model_name_or_path_or_dict, 
             adapter_name,
             cache_dir=cache_dir,
             local_files_only=local_files_only,
+            use_safetensors=True,
+            #local_files_only=local_files_only,
+            weight_name='pytorch_lora_weights.safetensors',
             **kwargs
         )
 

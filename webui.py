@@ -36,6 +36,8 @@ def stream_engine(width, height, steps, acceleration, model_id_or_path, model_ty
     t_index_list = list(range(steps))
     
     engine_dir = f'{parent_dir}/engines'
+    model_id_or_path = os.path.splitext(model_id_or_path)[0]
+    print(model_id_or_path)
 
     stream = StreamDiffusionWrapper(
         model_id_or_path=model_id_or_path,

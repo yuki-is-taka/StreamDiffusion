@@ -476,7 +476,11 @@ class StreamDiffusionWrapper:
                         local_files_only=self.local_files_only
                     )
                 else:
-                    stream.load_lcm_lora()
+                    stream.load_lcm_lora(
+                        pretrained_model_name_or_path_or_dict='latent-consistency/lcm-lora-sdv1-5',
+                        cache_dir=os.path.join(touchdiffusion_path, 'models/acceleration_loras'),
+                        local_files_only=self.local_files_only
+                    )
                 stream.fuse_lora()
 
             if isinstance(lora_dict, dict):
