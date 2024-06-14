@@ -181,12 +181,26 @@ def check_version():
 def open_link(link):
     webbrowser.open_new_tab(link)
 
+def init_dirs():
+    # Define the directory structure
+    directories = ['models', 'models/acceleration_loras', 'models/checkpoints', 'models/loras', 'models/vae']
+
+    # Check if directories exist, create them if they don't
+    for directory in directories:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            print(f"Created directory: {directory}")
+        else:
+            print(f"Directory already exists: {directory}")
+
 
 current_directory = os.getcwd()
 parent_dir = os.path.abspath(os.path.join(current_directory, os.pardir))
     
 models = list_files_in_folder('../models/checkpoints')
 model_type = ['sd_1.5', 'sd_1.5_turbo']
+
+init_dirs()
 
 button_info = [
     ("Github", "https://github.com/olegchomp/TouchDiffusion"),
