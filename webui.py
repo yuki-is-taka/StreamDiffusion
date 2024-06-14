@@ -17,6 +17,15 @@ except ImportError:
     print('Dependencies not installed')
 
 def list_files_in_folder(folder_path):
+    directories = ['../models', '../models/acceleration_loras', '../models/checkpoints', '../models/loras', '../models/vae']
+
+    for directory in directories:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            print(f"Created directory: {directory}")
+        else:
+            print(f"Directory already exists: {directory}")
+            
     file_list = [file for file in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, file))]
     return file_list
 
@@ -181,24 +190,11 @@ def check_version():
 def open_link(link):
     webbrowser.open_new_tab(link)
 
-def init_dirs():
-    directories = ['../models', '../models/acceleration_loras', '../models/checkpoints', '../models/loras', '../models/vae']
-    
-    for directory in directories:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            print(f"Created directory: {directory}")
-        else:
-            print(f"Directory already exists: {directory}")
-
-
 current_directory = os.getcwd()
 parent_dir = os.path.abspath(os.path.join(current_directory, os.pardir))
-    
+
 models = list_files_in_folder('../models/checkpoints')
 model_type = ['sd_1.5', 'sd_1.5_turbo']
-
-init_dirs()
 
 button_info = [
     ("Github", "https://github.com/olegchomp/TouchDiffusion"),
