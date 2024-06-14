@@ -1,7 +1,7 @@
 fire
 omegaconf
 cuda-python
-diffusers==0.24.0
+diffusers
 transformers
 accelerate
 onnx==1.15.0
@@ -9,4 +9,5 @@ onnxruntime==1.16.3
 protobuf==3.20.2
 colored
 gradio
+peft
 -e .
