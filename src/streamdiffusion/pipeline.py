@@ -98,10 +98,17 @@ class StreamDiffusion:
             str, Dict[str, torch.Tensor]
         ] = "latent-consistency/lcm-lora-sdv1-5",
         adapter_name: Optional[Any] = None,
+        local_files_only=False,
+        cache_dir='models/acceleration_loras',
         **kwargs,
+
     ) -> None:
         self.pipe.load_lora_weights(
-            pretrained_model_name_or_path_or_dict, adapter_name, **kwargs
+            pretrained_model_name_or_path_or_dict, 
+            adapter_name,
+            cache_dir=cache_dir,
+            local_files_only=local_files_only,
+            **kwargs
         )
 
     def load_lora(

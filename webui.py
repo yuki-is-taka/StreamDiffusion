@@ -4,6 +4,10 @@ import sys
 import time
 import subprocess
 import platform
+from pathlib import Path
+import requests
+import json
+import webbrowser
 
 #import torch
 
@@ -12,35 +16,16 @@ try:
 except ImportError:
     print('Dependencies not installed')
 
-def list_files_in_folder(hf_home):
-    if hf_home:
-        hf_home = f'{hf_home}/hub'
-        folders = [folder.replace('models--', '').replace('--', '/') for folder in os.listdir(hf_home) if os.path.isdir(os.path.join(hf_home, folder))]
-        return folders
+def list_files_in_folder(folder_path):
+    file_list = [file for file in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, file))]
+    return file_list
 
-# def download_model(model_url):
-#     pipeline = DiffusionPipeline.from_pretrained("stabilityai/sd-turbo", varia)
-#     # hf_hub_download(
-#     #     v
-#     # )
+def stream_engine(width, height, steps, acceleration, model_id_or_path, model_type):
 
-#     # snapshot_download(
-#     #     repo_id=model_url,
-#     #     cache_dir='../models/diffusers',
-#     #     revision='fp16'        
-#     #     )
-
-def stream_engine(width, height, steps, acceleration, model, provided_model):
-
-    model_id_or_path = provided_model if provided_model else model
-
-    # Determine acceleration method
     use_lcm_lora = acceleration == 'LCM'
-    turbo = acceleration == 'Turbo'
-    # Generate time index list
+
     t_index_list = list(range(steps))
     
-
     engine_dir = f'{parent_dir}/engines'
 
     stream = StreamDiffusionWrapper(
@@ -54,12 +39,12 @@ def stream_engine(width, height, steps, acceleration, model, provided_model):
         acceleration="tensorrt",
         mode="img2img",
         use_denoising_batch=True,
-        cfg_type="none",
+        cfg_type="self",
         seed=2,
         use_lcm_lora = use_lcm_lora,
         touchdiffusion = False,
         engine_dir=engine_dir,
-        turbo=turbo
+        model_type=model_type
     )
 
     stream.prepare(
@@ -70,7 +55,7 @@ def stream_engine(width, height, steps, acceleration, model, provided_model):
         delta=0.5,
         t_index_list=t_index_list
     )
-
+    
     input = f'{parent_dir}/StreamDiffusion/images/inputs/input.png'
     #os.path.abspath('StreamDiffusion/images/inputs/input.png')
     image_tensor = stream.preprocess_image(input)
@@ -96,7 +81,13 @@ def is_installed(package_name):
         return True
     except subprocess.CalledProcessError:
         return False
-
+    
+def update_interactivity(selected_value):
+    if selected_value == "sd_1.5_turbo":
+        return gr.Radio(["None"], value='None', label='Acceleration Lora not avaliable for this model')
+    else:
+        return gr.Radio(["None", "LCM"], value='None', label='Add Acceleration Lora')
+    
 def inst_upd():
     cu="11"
     error_packages = []
@@ -156,67 +147,99 @@ def inst_upd():
             subprocess.run(["pip", "install", "pywin32"], check=True)
         except subprocess.CalledProcessError:
             error_packages.append("Failed to install pywin32")
+    try:
+        import tensorrt as trt
+        print(trt)
+    except Exception as e:
+        print(f"An unexpected error occurred while executing the command: {e}")
 
     if error_packages:
         return f"Error installing packages: {', '.join(error_packages)}"
     else:
         return "All packages installed successfully! You need to restart webui.bat to apply changes."
 
+def fix_pop():
+    try:
+        subprocess.check_call(["pip", "uninstall", "-y", "nvidia-cudnn-cu11"])
+        return 'Done. You need to restart webui.bat to apply changes.'
+    except Exception as e:
+        return f"An unexpected error occurred while executing the command: {e}"
+    
+def check_version():
+    url = 'https://api.github.com/repos/olegchomp/TouchDiffusion/releases/latest'
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            gitversion = data['name']
+            return gitversion
+        else:
+            return 'No internet connection'
+    except Exception as e:
+        return 'No internet connection'
+
+def open_link(link):
+    webbrowser.open_new_tab(link)
+
 
 current_directory = os.getcwd()
 parent_dir = os.path.abspath(os.path.join(current_directory, os.pardir))
-hf_home = os.getenv('HF_HOME')
-if not hf_home:
-    os.environ['HF_HOME'] = f'{parent_dir}/models'
     
-models = list_files_in_folder(hf_home)
+models = list_files_in_folder('../models/checkpoints')
+model_type = ['sd_1.5', 'sd_1.5_turbo']
+
+button_info = [
+    ("Github", "https://github.com/olegchomp/TouchDiffusion"),
+    ("Discord", "https://discord.gg/wNW8xkEjrf"),
+    ("Youtube", "https://www.youtube.com/vjschool"),
+    ("Telegram", "https://t.me/vjschool"),
+    ("Author", "https://olegcho.mp/"),
+    ("Buy me a coffee", "https://boosty.to/vjschool/")
+    ]
 
 with gr.Blocks() as demo:
     with gr.Tab("Engine"):
         with gr.Row():
             with gr.Column(scale=1):
-                width_slider = gr.Slider(512, 512, value=512, step=2, label='Width', interactive=True)
-                height_slider = gr.Slider(512, 512, value=512, step=2, label='Height', interactive=True)
+                model_dropdown = gr.Dropdown(models, label=f"Select model")
+                model_type = gr.Dropdown(model_type, label=f"Select model type")
+                width_slider = gr.Slider(256, 1024, value=512, step=8, label='Width', interactive=True)
+                height_slider = gr.Slider(256, 1024, value=512, step=8, label='Height', interactive=True)
                 sampling_steps_slider = gr.Slider(1, 20, value=1, step=1, label='Sampling steps (Batch size)', interactive=True)
-                acceleration_radio = gr.Radio(["None", "Turbo", "LCM"], label='Acceleration')
-                model_dropdown = gr.Dropdown(models, label=f"Select model from {hf_home}")
-                model_textbox = gr.Textbox(label=f"Or provide model name")
+                acceleration_radio = gr.Radio(["None"], value='None', label='Add Acceleration Lora')
             with gr.Column(scale=1):
                 output = gr.Textbox(label="Output")
-                make_engine = gr.Button("Make engine")
+                make_engine = gr.Button("Make engine", variant='primary')
 
             make_engine.click(fn=stream_engine, 
                               inputs=[width_slider, height_slider,
                                       sampling_steps_slider, acceleration_radio,
-                                      model_dropdown, model_textbox], 
+                                      model_dropdown, model_type], 
                               outputs=output)
+            model_type.change(fn=update_interactivity, inputs=model_type, outputs=acceleration_radio)
 
-    # with gr.Tab("Download model"):
-    #     with gr.Row():
-    #         with gr.Column(scale=1):
-    #             # Button for triggering update
-    #             gr.Text("This action will download model weights.", label='Description')
-    #             model_url = gr.Textbox(label=f"Model name (ex. stabilityai/sd-turbo)")
-    #             download = gr.Button("Download")
-
-    #             # Textbox to display output
-    #         with gr.Column(scale=1):
-    #             output = gr.Textbox(label="Output")
-    #             # Attach click event to the button to trigger inst_upd function
-                
-    #         download.click(fn=download_model, inputs=[model_url], outputs=output)
     with gr.Tab("Install & Update"):
         with gr.Row():
             with gr.Column(scale=1):
-                # Button for triggering update
                 gr.Text("This action will install or update required dependencies.", label='Description')
-                install_update = gr.Button("Update dependencies")
-                # Textbox to display output
+                install_update = gr.Button("Update dependencies", variant='primary')
+                gr.Text("If you get pop up window with error, click 'fix pop up' button.", label='Additional step')
+                fix_popup = gr.Button("Fix pop up", variant='secondary')
             with gr.Column(scale=1):
                 output = gr.Textbox(label="Output")
-                # Attach click event to the button to trigger inst_upd function
 
             install_update.click(fn=inst_upd, inputs=[], outputs=output)
-
+            fix_popup.click(fn=fix_pop, inputs=[], outputs=output)
+    with gr.Tab("About"):
+        with gr.Row():
+            with gr.Column(scale=1):
+                gr.Text("TouchDiffusion-v.0.0.2", label='Your version', interactive=False)
+                gr.Text(check_version, label='Latest version', interactive=False)
+            with gr.Column(scale=1):
+                with gr.Row():
+                    for label, url in button_info:
+                        button = gr.Button(label, variant='secondary')
+                        button.click(lambda url=url: open_link(url))
+                        
 if __name__ == "__main__":
     demo.launch()
