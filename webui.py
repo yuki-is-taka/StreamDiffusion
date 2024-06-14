@@ -182,10 +182,8 @@ def open_link(link):
     webbrowser.open_new_tab(link)
 
 def init_dirs():
-    # Define the directory structure
-    directories = ['models', 'models/acceleration_loras', 'models/checkpoints', 'models/loras', 'models/vae']
-
-    # Check if directories exist, create them if they don't
+    directories = ['../models', '../models/acceleration_loras', '../models/checkpoints', '../models/loras', '../models/vae']
+    
     for directory in directories:
         if not os.path.exists(directory):
             os.makedirs(directory)
