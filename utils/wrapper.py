@@ -16,7 +16,6 @@ torch.set_grad_enabled(False)
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
-
 module_path = os.path.abspath(__file__)
 touchdiffusion_path = os.path.abspath(os.path.join(module_path, "../../../"))
 
