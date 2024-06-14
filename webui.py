@@ -17,7 +17,7 @@ except ImportError:
     print('Dependencies not installed')
 
 def list_files_in_folder(folder_path):
-    directories = ['../models', '../models/acceleration_loras', '../models/checkpoints', '../models/loras', '../models/vae']
+    directories = ['../models', '../models/acceleration_loras', '../models/checkpoints', '../models/loras', '../models/vae', '../engines']
 
     for directory in directories:
         if not os.path.exists(directory):
@@ -25,7 +25,7 @@ def list_files_in_folder(folder_path):
             print(f"Created directory: {directory}")
         else:
             print(f"Directory already exists: {directory}")
-            
+
     file_list = [file for file in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, file))]
     return file_list
 
@@ -157,6 +157,7 @@ def inst_upd():
         except subprocess.CalledProcessError:
             error_packages.append("Failed to install pywin32")
     try:
+        import torch
         import tensorrt as trt
         print(trt)
     except Exception as e:
