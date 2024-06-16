@@ -1,7 +1,7 @@
 fire
 omegaconf
 cuda-python
-diffusers
+diffusers==0.29.0
 transformers
 accelerate
 onnx==1.15.0
