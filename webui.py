@@ -39,6 +39,9 @@ def stream_engine(width, height, steps, acceleration, model_id_or_path, model_ty
     model_id_or_path = os.path.splitext(model_id_or_path)[0]
     print(model_id_or_path)
 
+    if model_id_or_path == 'SD Turbo':
+        model_id_or_path = 'sd-turbo'
+
     stream = StreamDiffusionWrapper(
         model_id_or_path=model_id_or_path,
         lora_dict=None,
@@ -93,11 +96,22 @@ def is_installed(package_name):
     except subprocess.CalledProcessError:
         return False
     
+# def update_interactivity(selected_value):
+#     if selected_value == "sd_1.5_turbo":
+#         return gr.Radio(["None"], value='None', label='Acceleration Lora not avaliable for this model')
+#     else:
+#         return gr.Radio(["None", "LCM"], value='None', label='Add Acceleration Lora')
+
 def update_interactivity(selected_value):
     if selected_value == "sd_1.5_turbo":
-        return gr.Radio(["None"], value='None', label='Acceleration Lora not avaliable for this model')
+        return gr.Dropdown(value="SD Turbo", allow_custom_value=True, interactive=False), gr.Radio(["None"], value='None', label='Acceleration Lora not available for this model')
     else:
-        return gr.Radio(["None", "LCM"], value='None', label='Add Acceleration Lora')
+        if len(models) > 0:
+            value = models[0]
+        else:
+            value = ''
+        return gr.Dropdown(models, value=value, interactive=True), gr.Radio(["None", "LCM"], value='None', label='Add Acceleration Lora')
+
     
 def inst_upd():
     cu="11"
@@ -212,8 +226,8 @@ with gr.Blocks() as demo:
     with gr.Tab("Engine"):
         with gr.Row():
             with gr.Column(scale=1):
-                model_dropdown = gr.Dropdown(models, label=f"Select model")
                 model_type = gr.Dropdown(model_type, label=f"Select model type")
+                model_dropdown = gr.Dropdown(models, label=f"Select model", scale=2)
                 width_slider = gr.Slider(256, 1024, value=512, step=8, label='Width', interactive=True)
                 height_slider = gr.Slider(256, 1024, value=512, step=8, label='Height', interactive=True)
                 sampling_steps_slider = gr.Slider(1, 20, value=1, step=1, label='Sampling steps (Batch size)', interactive=True)
@@ -227,7 +241,8 @@ with gr.Blocks() as demo:
                                       sampling_steps_slider, acceleration_radio,
                                       model_dropdown, model_type], 
                               outputs=output)
-            model_type.change(fn=update_interactivity, inputs=model_type, outputs=acceleration_radio)
+            #model_type.change(fn=update_interactivity, inputs=model_type, outputs=acceleration_radio)
+            model_type.change(fn=update_interactivity, inputs=model_type, outputs=[model_dropdown, acceleration_radio])
 
     with gr.Tab("Install & Update"):
         with gr.Row():

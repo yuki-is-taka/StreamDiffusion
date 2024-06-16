@@ -443,9 +443,23 @@ class StreamDiffusionWrapper:
         StreamDiffusion
             The loaded model.
         """
+        # ['sd_1.5', 'sd_1.5_turbo']
         try:
-            pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
-                    os.path.join(touchdiffusion_path, 'models/checkpoints', f'{model_id_or_path}.safetensors'),
+            if self.model_type == 'sd_1.5':
+                pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
+                        os.path.join(touchdiffusion_path, 'models/checkpoints', f'{model_id_or_path}.safetensors'),
+                        cache_dir = os.path.join(touchdiffusion_path, 'models/checkpoints'), 
+                        use_safetensors=True,
+                        local_files_only=self.local_files_only,
+                        torch_dtype = torch.float16,
+                        variant="fp16",
+                        add_watermarker=False,
+                        safety_checker=None
+                    ).to(device=self.device, dtype=self.dtype)
+            elif self.model_type == 'sd_1.5_turbo':
+                pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_pretrained(
+                    "stabilityai/sd-turbo",
+                    #os.path.join(touchdiffusion_path, 'models/checkpoints', "stabilityai/sd-turbo"),
                     cache_dir = os.path.join(touchdiffusion_path, 'models/checkpoints'), 
                     use_safetensors=True,
                     local_files_only=self.local_files_only,
@@ -456,8 +470,8 @@ class StreamDiffusionWrapper:
                 ).to(device=self.device, dtype=self.dtype)
         except Exception as e:  # No model found
             #traceback.print_exc()
-            print(e)
             print("Model load has failed. Doesn't exist.")
+            print(e)
 
         stream = StreamDiffusion(
             pipe=pipe,
