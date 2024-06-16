@@ -41,7 +41,7 @@ def numpy_to_pil(images: np.ndarray) -> PIL.Image.Image:
 
 def postprocess_image(
     image: torch.Tensor,
-    output_type: str = "pil",
+    output_type: str = "pt",
     do_denormalize: Optional[List[bool]] = None,
 ) -> Union[torch.Tensor, np.ndarray, PIL.Image.Image]:
     if not isinstance(image, torch.Tensor):

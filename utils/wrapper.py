@@ -26,7 +26,7 @@ class StreamDiffusionWrapper:
         t_index_list: List[int],
         lora_dict: Optional[Dict[str, float]] = None,
         mode: Literal["img2img", "txt2img"] = "img2img",
-        output_type: Literal["pil", "pt", "np", "latent"] = "pil",
+        output_type: Literal["pil", "pt", "np", "latent"] = "pt",
         lcm_lora_id: Optional[str] = None,
         vae_id: Optional[str] = None,
         device: Literal["cpu", "cuda"] = "cuda",
@@ -447,8 +447,11 @@ class StreamDiffusionWrapper:
             pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
                     os.path.join(touchdiffusion_path, 'models/checkpoints', f'{model_id_or_path}.safetensors'),
                     cache_dir = os.path.join(touchdiffusion_path, 'models/checkpoints'), 
+                    use_safetensors=True,
                     local_files_only=self.local_files_only,
                     torch_dtype = torch.float16,
+                    variant="fp16",
+                    add_watermarker=False,
                     safety_checker=None
                 ).to(device=self.device, dtype=self.dtype)
         except Exception as e:  # No model found
@@ -496,7 +499,7 @@ class StreamDiffusionWrapper:
                 )
             else:
                 stream.vae = AutoencoderTiny.from_pretrained("madebyollin/taesd",
-                                                             cache_dir = os.path.join(touchdiffusion_path, 'models/vae'), 
+                                                             cache_dir = os.path.join(touchdiffusion_path, 'models/vae'),
                                                              local_files_only=self.local_files_only).to(
                     device=pipe.device, dtype=pipe.dtype
                 )

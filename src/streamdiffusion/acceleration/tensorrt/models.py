@@ -66,7 +66,7 @@ class Optimizer:
 class BaseModel:
     def __init__(
         self,
-        fp16=False,
+        fp16=True,
         device="cuda",
         verbose=True,
         max_batch_size=16,

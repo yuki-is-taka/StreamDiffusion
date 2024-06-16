@@ -92,6 +92,12 @@ class StreamDiffusion:
 
         self.inference_time_ema = 0
 
+        self.previous_prompt = None
+        self.previous_negative_prompt = None 
+
+        self.negative_prompt_embeds = None
+        self.prompt_embeds = None
+
     def load_lcm_lora(
         self,
         pretrained_model_name_or_path_or_dict: Union[
@@ -304,6 +310,14 @@ class StreamDiffusion:
         ) -> None:
         # Set the prompt embeds cache
         # Shape: (Bp, S, D), (Bp: batch size of input prompt, S: sequence length, D: hidden size)
+        if (
+            self.prompt_embeds is not None 
+            and self.negative_prompt_embeds is not None 
+            and self.previous_prompt == prompt
+            and self.previous_negative_prompt == negative_prompt 
+        ):
+            return
+        print('new prompt')
         if negative_prompt is None:
             encoder_output = self.pipe.encode_prompt(
                 prompt=prompt,
@@ -320,6 +334,7 @@ class StreamDiffusion:
                 negative_prompt=negative_prompt,
             )
             self.negative_prompt_embeds = encoder_output[1]
+
         self.prompt_embeds = encoder_output[0].repeat(self.batch_size, 1, 1)
 
         if self.use_denoising_batch and self.cfg_type == "full":
@@ -331,6 +346,9 @@ class StreamDiffusion:
             self.prompt_embeds = torch.cat(
                 [uncond_prompt_embeds, self.prompt_embeds], dim=0
             )
+        
+        self.previous_prompt = prompt
+        self.previous_negative_prompt = negative_prompt 
 
     @torch.no_grad()
     def update_noise(self, noise: Union[None, torch.Tensor] = None) -> None:
@@ -406,6 +424,9 @@ class StreamDiffusion:
         # set prompt embeds cache
         if (self.cfg_type == "initialize" or self.cfg_type == "full") and negative_prompt is None:
             negative_prompt = ""
+
+        self.negative_prompt_embeds = None
+        self.prompt_embeds = None 
         self.update_prompt(prompt, negative_prompt)
 
         # set scheduler cache
@@ -641,6 +662,7 @@ class StreamDiffusion:
         x_output = self.decode_image(x_0_pred_out).detach().clone()
         return x_output
 
+    @torch.no_grad()
     def txt2img_sd_turbo(self, batch_size: int = 1) -> torch.Tensor:
         x_t_latent = torch.randn(
             (batch_size, 4, self.latent_height, self.latent_width),
