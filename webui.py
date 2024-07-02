@@ -101,8 +101,14 @@ def is_installed(package_name):
 #         return gr.Radio(["None"], value='None', label='Acceleration Lora not avaliable for this model')
 #     else:
 #         return gr.Radio(["None", "LCM"], value='None', label='Add Acceleration Lora')
+def update_acceleration_lora(amount_steps, model_type):
+        if model_type != 'sd_1.5_turbo' and model_type != None:
+            if amount_steps in [1,2,4,8]:
+                return ["None", "LCM", 'HyperSD']
+            else:
+                return ["None", "LCM"]
 
-def update_interactivity(selected_value):
+def update_interactivity(selected_value, amount_steps):
     if selected_value == "sd_1.5_turbo":
         return gr.Dropdown(value="SD Turbo", allow_custom_value=True, interactive=False), gr.Radio(["None"], value='None', label='Acceleration Lora not available for this model')
     else:
@@ -110,9 +116,13 @@ def update_interactivity(selected_value):
             value = models[0]
         else:
             value = ''
-        return gr.Dropdown(models, value=value, interactive=True), gr.Radio(["None", "LCM"], value='None', label='Add Acceleration Lora')
+        lora_list = update_acceleration_lora(amount_steps, selected_value)
+        return gr.Dropdown(models, value=value, interactive=True), gr.Radio(lora_list, value='None', label='Add Acceleration Lora')
 
-    
+def update_hypersd(amount_steps, model_type):
+    lora_list = update_acceleration_lora(amount_steps, model_type)
+    return gr.Radio(lora_list, value='None', label='Add Acceleration Lora')
+
 def inst_upd():
     cu="11"
     error_packages = []
@@ -242,8 +252,9 @@ with gr.Blocks() as demo:
                                       model_dropdown, model_type], 
                               outputs=output)
             #model_type.change(fn=update_interactivity, inputs=model_type, outputs=acceleration_radio)
-            model_type.change(fn=update_interactivity, inputs=model_type, outputs=[model_dropdown, acceleration_radio])
-
+            model_type.change(fn=update_interactivity, inputs=[model_type,sampling_steps_slider], outputs=[model_dropdown, acceleration_radio])
+            sampling_steps_slider.change(fn=update_hypersd, inputs=[sampling_steps_slider,model_type], outputs=[acceleration_radio])
+    
     with gr.Tab("Install & Update"):
         with gr.Row():
             with gr.Column(scale=1):
@@ -259,7 +270,7 @@ with gr.Blocks() as demo:
     with gr.Tab("About"):
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Text("TouchDiffusion-v.0.0.2", label='Your version', interactive=False)
+                gr.Text("TouchDiffusion-v.0.0.3", label='Your version', interactive=False)
                 gr.Text(check_version, label='Latest version', interactive=False)
             with gr.Column(scale=1):
                 with gr.Row():

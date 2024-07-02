@@ -28,6 +28,7 @@ class StreamDiffusion:
         cfg_type: Literal["none", "full", "self", "initialize"] = "self",
         generator: Optional[torch.Generator] = torch.Generator(),
         denoising_steps_num: Union[None, int] = None,
+        CM_lora_type: Literal["lcm", "Hyper_SD", "none"] = "none",
     ) -> None:
         self.device = pipe.device
         self.dtype = torch_dtype
@@ -40,6 +41,8 @@ class StreamDiffusion:
         self.latent_width = int(width // pipe.vae_scale_factor)
 
         self.cfg_type = cfg_type
+
+        self.CM_lora_type = CM_lora_type
 
         self.frame_bff_size = frame_buffer_size
 
@@ -109,7 +112,8 @@ class StreamDiffusion:
         **kwargs,
 
     ) -> None:
-        #kwargs = {"local_files_only": False, "weight_name": "pytorch_lora_weights.safetensors"} 
+        #kwargs = {"local_files_only": False, "weight_name": "pytorch_lora_weights.safetensors"}
+        self.CM_lora_type = "lcm"
         self.pipe.load_lora_weights(
             pretrained_model_name_or_path_or_dict, 
             adapter_name,
@@ -120,6 +124,45 @@ class StreamDiffusion:
             weight_name='pytorch_lora_weights.safetensors',
             **kwargs
         )
+
+    def load_HyperSD_lora(
+        self,
+        pretrained_model_name_or_path_or_dict: Union[
+            str, Dict[str, torch.Tensor]
+        ] = "ByteDance/Hyper-SD",
+        adapter_name: Optional[Any] = None,
+        local_files_only=False,
+        cache_dir='models/acceleration_loras',
+        **kwargs,
+    ) -> None:
+        
+        self.CM_lora_type = "Hyper_SD"
+
+        # self.pipe.load_lora_weights(
+        #     hf_hub_download(pretrained_model_name_or_path_or_dict,"Hyper-SD15-1step-lora.safetensors"), adapter_name, **kwargs
+        # )
+
+        
+        weights = ['Hyper-SD15-1step-lora.safetensors',
+        'Hyper-SD15-2steps-lora.safetensors',
+        'Hyper-SD15-4steps-lora.safetensors',
+        'Hyper-SD15-8steps-lora.safetensors']
+        # Hyper-SD15-8steps-CFG-lora.safetensors
+        # Hyper-SD15-12steps-CFG-lora.safetensors
+
+        selected_weight = weights[self.denoising_steps_num-1]
+        print(selected_weight)
+
+        self.pipe.load_lora_weights(
+            pretrained_model_name_or_path_or_dict, 
+            adapter_name,
+            cache_dir=cache_dir,
+            local_files_only=local_files_only,
+            use_safetensors=True,
+            weight_name=selected_weight,
+            **kwargs
+        )
+        
 
     def load_lora(
         self,
@@ -577,12 +620,27 @@ class StreamDiffusion:
 
             if self.denoising_steps_num > 1:
                 x_0_pred_out = x_0_pred_batch[-1].unsqueeze(0)
-                if self.do_add_noise:
+                # if self.do_add_noise:
+                #     self.x_t_latent_buffer = (
+                #         self.alpha_prod_t_sqrt[1:] * x_0_pred_batch[:-1]
+                #         + self.beta_prod_t_sqrt[1:] * self.init_noise[1:]
+                #     )
+                # else:
+                if self.CM_lora_type == "Hyper_SD":
                     self.x_t_latent_buffer = (
                         self.alpha_prod_t_sqrt[1:] * x_0_pred_batch[:-1]
-                        + self.beta_prod_t_sqrt[1:] * self.init_noise[1:]
+                        + self.beta_prod_t_sqrt[1:] * model_pred[:-1]
                     )
-                else:
+                elif self.CM_lora_type == "lcm" or self.CM_lora_type == "none":
+                    if self.do_add_noise:
+                        self.x_t_latent_buffer = (
+                            self.alpha_prod_t_sqrt[1:] * x_0_pred_batch[:-1]
+                            + self.beta_prod_t_sqrt[1:] * self.init_noise[1:]
+                        )
+                    else:
+                        self.x_t_latent_buffer = (
+                            self.alpha_prod_t_sqrt[1:] * x_0_pred_batch[:-1]
+                        )
                     self.x_t_latent_buffer = (
                         self.alpha_prod_t_sqrt[1:] * x_0_pred_batch[:-1]
                     )
@@ -598,7 +656,9 @@ class StreamDiffusion:
                     self.frame_bff_size,
                 )
                 x_0_pred, model_pred = self.unet_step(x_t_latent, t, idx)
-                if idx < len(self.sub_timesteps_tensor) - 1:
+                if self.CM_lora_type == "Hyper_SD":
+                    x_t_latent = self.alpha_prod_t_sqrt[idx + 1] * x_0_pred + self.beta_prod_t_sqrt[idx + 1] * model_pred
+                elif self.CM_lora_type == "lcm" or self.CM_lora_type == "none":
                     if self.do_add_noise:
                         x_t_latent = self.alpha_prod_t_sqrt[
                             idx + 1

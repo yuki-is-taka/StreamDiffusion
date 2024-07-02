@@ -39,6 +39,7 @@ class StreamDiffusionWrapper:
         do_add_noise: bool = True,
         device_ids: Optional[List[int]] = None,
         use_lcm_lora: bool = True,
+        use_hyper_lora: bool = True,
         use_tiny_vae: bool = True,
         enable_similar_image_filter: bool = False,
         similar_image_filter_threshold: float = 0.98,
@@ -170,6 +171,7 @@ class StreamDiffusionWrapper:
             warmup=warmup,
             do_add_noise=do_add_noise,
             use_lcm_lora=use_lcm_lora,
+            use_hyper_lora=use_hyper_lora,
             use_tiny_vae=use_tiny_vae,
             cfg_type=cfg_type,
             seed=seed,
@@ -388,6 +390,7 @@ class StreamDiffusionWrapper:
         warmup: int = 10,
         do_add_noise: bool = True,
         use_lcm_lora: bool = False,
+        use_hyper_lora: bool = False,
         use_tiny_vae: bool = True,
         cfg_type: Literal["none", "full", "self", "initialize"] = "self",
         seed: int = 2,
@@ -499,6 +502,13 @@ class StreamDiffusionWrapper:
                         local_files_only=self.local_files_only
                     )
                 stream.fuse_lora()
+            elif use_hyper_lora:
+                stream.load_HyperSD_lora(
+                    cache_dir=os.path.join(touchdiffusion_path, 'models/acceleration_loras'),
+                    local_files_only=self.local_files_only
+                )
+            else:
+                pass
 
             if isinstance(lora_dict, dict):
                 for lora_name, lora_scale in lora_dict.items():
@@ -544,6 +554,8 @@ class StreamDiffusionWrapper:
                 
                 if use_lcm_lora == True:
                     acceleration_mode = 'LCM'
+                elif use_hyper_lora == True:
+                    acceleration_mode = 'HyperSD'
                 else:
                     acceleration_mode = 'None'
 
