@@ -40,7 +40,7 @@ def stream_engine(width, height, steps, acceleration, model_id_or_path, model_ty
 
     t_index_list = list(range(steps))
     
-    engine_dir = f'{parent_dir}/engines'
+    engine_dir = f'engines'
     model_id_or_path = os.path.splitext(model_id_or_path)[0]
     print(model_id_or_path)
 
@@ -76,7 +76,7 @@ def stream_engine(width, height, steps, acceleration, model_id_or_path, model_ty
         t_index_list=t_index_list
     )
     
-    input = f'{parent_dir}/StreamDiffusion/images/inputs/input.png'
+    input = f'{current_dir}/images/inputs/input.png'
 
     image_tensor = stream.preprocess_image(input)
     fps = 0
@@ -140,10 +140,13 @@ def update_hypersd(amount_steps, model_type):
 def inst_upd():
     cu="11"
     error_packages = []
-    with open('requirements.txt', "r") as file:
-        packages = file.read().splitlines()
 
+    os.chdir(current_dir)
+    
     git_fn("pull")
+
+    with open(f'requirements.txt', "r") as file:
+        packages = file.read().splitlines()
 
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "torch==2.1.0", "torchvision==0.16.0", "--index-url", "https://download.pytorch.org/whl/cu118"])
@@ -232,6 +235,7 @@ def open_link(link):
 
 current_directory = os.getcwd()
 parent_dir = os.path.abspath(os.path.join(current_directory, os.pardir))
+print(current_dir, parent_dir)
 
 models = list_files_in_folder('models/checkpoints')
 model_type = ['sd_1.5', 'sd_1.5_turbo']
