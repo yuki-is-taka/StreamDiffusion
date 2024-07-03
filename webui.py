@@ -32,6 +32,7 @@ def list_files_in_folder(folder_path):
 def stream_engine(width, height, steps, acceleration, model_id_or_path, model_type):
 
     use_lcm_lora = acceleration == 'LCM'
+    use_hyper_lora = acceleration == 'HyperSD'
 
     t_index_list = list(range(steps))
     
@@ -56,6 +57,7 @@ def stream_engine(width, height, steps, acceleration, model_id_or_path, model_ty
         cfg_type="self",
         seed=2,
         use_lcm_lora = use_lcm_lora,
+        use_hyper_lora = use_hyper_lora,
         touchdiffusion = False,
         engine_dir=engine_dir,
         model_type=model_type
