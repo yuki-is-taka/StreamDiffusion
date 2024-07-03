@@ -98,12 +98,11 @@ def git_fn(git_type):
     repo_url = 'https://github.com/olegchomp/StreamDiffusion'
 
     try:
-        subprocess.run(["git", git_type, repo_url], check=True)
-        subprocess.run(["git", "reset", "--hard"], check=True)
-    except FileNotFoundError:
-        print("Git is not installed or not found. Using portable Git instead.")
         subprocess.run([git_executable, "reset", "--hard"], check=True)
         subprocess.run([git_executable, git_type, repo_url], check=True)
+    except FileNotFoundError:
+        subprocess.run(["git", git_type, repo_url], check=True)
+        subprocess.run(["git", "reset", "--hard"], check=True)
     except subprocess.CalledProcessError:
         print(f"Failed to {git_type} the repository.")
     
