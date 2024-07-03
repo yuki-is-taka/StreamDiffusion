@@ -221,6 +221,8 @@ def re_download():
     
     git_fn("clone")
 
+    return "Run Update dependencies to verify download"
+
 
         
 def check_version():
