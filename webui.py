@@ -13,7 +13,6 @@ import shutil
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 git_executable = os.path.join(current_dir, '..', 'PortableGit', 'cmd', 'git.exe')
-print(git_executable)
 
 try:
     from utils.wrapper import StreamDiffusionWrapper
@@ -237,7 +236,6 @@ def open_link(link):
 
 current_directory = os.getcwd()
 parent_dir = os.path.abspath(os.path.join(current_directory, os.pardir))
-print(current_dir, parent_dir)
 
 models = list_files_in_folder('models/checkpoints')
 model_type = ['sd_1.5', 'sd_1.5_turbo']
