@@ -13,6 +13,7 @@ import shutil
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 git_executable = os.path.join(current_dir, '..', 'PortableGit', 'cmd', 'git.exe')
+print(git_executable)
 
 try:
     from utils.wrapper import StreamDiffusionWrapper
@@ -20,7 +21,7 @@ except ImportError:
     print('Dependencies not installed')
 
 def list_files_in_folder(folder_path):
-    directories = ['../models', '../models/acceleration_loras', '../models/checkpoints', '../models/loras', '../models/vae', '../engines']
+    directories = ['models', 'models/acceleration_loras', 'models/checkpoints', 'models/loras', 'models/vae', 'engines']
 
     for directory in directories:
         if not os.path.exists(directory):
@@ -212,19 +213,7 @@ def fix_pop():
     except Exception as e:
         return f"An unexpected error occurred while executing the command: {e}"
 
-def re_download():
-    try:
-        shutil.rmtree(current_dir)
-        print(f"Folder '{current_dir}' successfully deleted.")
-    except OSError as e:
-        print(f"Error: {current_dir} : {e.strerror}")
-    
-    git_fn("clone")
-
-    return "Run Update dependencies to verify download"
-
-
-        
+       
 def check_version():
     url = 'https://api.github.com/repos/olegchomp/TouchDiffusion/releases/latest'
     try:
@@ -244,7 +233,7 @@ def open_link(link):
 current_directory = os.getcwd()
 parent_dir = os.path.abspath(os.path.join(current_directory, os.pardir))
 
-models = list_files_in_folder('../models/checkpoints')
+models = list_files_in_folder('models/checkpoints')
 model_type = ['sd_1.5', 'sd_1.5_turbo']
 
 button_info = [
@@ -285,14 +274,11 @@ with gr.Blocks() as demo:
                 install_update = gr.Button("Update dependencies", variant='primary')
                 gr.Text("If you get pop up window with error, click 'fix pop up' button.", label='Additional step')
                 fix_popup = gr.Button("Fix pop up", variant='secondary')
-                gr.Text("This action will delete & download StreamDiffusion again.", label='Additional step')
-                redownload = gr.Button("Redownload", variant='secondary')
             with gr.Column(scale=1):
                 output = gr.Textbox(label="Output")
 
             install_update.click(fn=inst_upd, inputs=[], outputs=output)
             fix_popup.click(fn=fix_pop, inputs=[], outputs=output)
-            redownload.click(fn=re_download, inputs=[], outputs=output)
     with gr.Tab("About"):
         with gr.Row():
             with gr.Column(scale=1):
