@@ -8,8 +8,11 @@ from pathlib import Path
 import requests
 import json
 import webbrowser
+import shutil
 
-#import torch
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
+git_executable = os.path.join(current_dir, '..', 'PortableGit', 'cmd', 'git.exe')
 
 try:
     from utils.wrapper import StreamDiffusionWrapper
@@ -73,7 +76,7 @@ def stream_engine(width, height, steps, acceleration, model_id_or_path, model_ty
     )
     
     input = f'{parent_dir}/StreamDiffusion/images/inputs/input.png'
-    #os.path.abspath('StreamDiffusion/images/inputs/input.png')
+
     image_tensor = stream.preprocess_image(input)
     fps = 0
     for i in range(10):
@@ -91,18 +94,26 @@ def stream_engine(width, height, steps, acceleration, model_id_or_path, model_ty
 
     return f"""Model: {model_id_or_path}\nWxH: {width}x{height}\nBatch size: {steps}\nExpected: {int(fps)} FPS\nStatus: Ready"""
 
+def git_fn(git_type):
+    repo_url = 'https://github.com/olegchomp/StreamDiffusion'
+
+    try:
+        subprocess.run(["git", git_type, repo_url], check=True)
+    except FileNotFoundError:
+        print("Git is not installed or not found. Using portable Git instead.")
+        subprocess.run([git_executable, git_type, repo_url], check=True)
+    except subprocess.CalledProcessError:
+        print(f"Failed to {git_type} the repository.")
+    
+    return
+
 def is_installed(package_name):
     try:
-        subprocess.run(["pip", "show", package_name], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run([sys.executable, "-m", "pip", "show", package_name], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return True
     except subprocess.CalledProcessError:
         return False
     
-# def update_interactivity(selected_value):
-#     if selected_value == "sd_1.5_turbo":
-#         return gr.Radio(["None"], value='None', label='Acceleration Lora not avaliable for this model')
-#     else:
-#         return gr.Radio(["None", "LCM"], value='None', label='Add Acceleration Lora')
 def update_acceleration_lora(amount_steps, model_type):
         if model_type != 'sd_1.5_turbo' and model_type != None:
             if amount_steps in [1,2,4,8]:
@@ -131,20 +142,17 @@ def inst_upd():
     with open('requirements.txt', "r") as file:
         packages = file.read().splitlines()
 
-    try:
-        subprocess.run(["git", "pull"], check=True)
-    except subprocess.CalledProcessError:
-        pass
+    git_fn("pull")
 
     try:
-        subprocess.check_call(["pip", "install", "torch==2.1.0", "torchvision==0.16.0", "--index-url", "https://download.pytorch.org/whl/cu118"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "torch==2.1.0", "torchvision==0.16.0", "--index-url", "https://download.pytorch.org/whl/cu118"])
     except Exception as e:
         print(f"An unexpected error occurred while executing the command: {e}")
         error_packages.append('torch==2.1.0')
 
     for package in packages:
         try:
-            subprocess.check_call(["pip", "install", package])
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
         except subprocess.CalledProcessError:
             error_packages.append(package)
         except Exception as e:
@@ -163,31 +171,32 @@ def inst_upd():
     # Install TensorRT
     if not is_installed("tensorrt"):
         try:
-            subprocess.run(["pip", "install", f"{cudnn_name}", "--no-cache-dir"], check=True)
-            subprocess.run(["pip", "install", "--pre", "--extra-index-url", "https://pypi.nvidia.com", "tensorrt==9.0.1.post11.dev4", "--no-cache-dir"], check=True)
+            subprocess.run([sys.executable, "-m", "pip", "install", f"{cudnn_name}", "--no-cache-dir"], check=True)
+            subprocess.run([sys.executable, "-m", "pip", "install", "--pre", "--extra-index-url", "https://pypi.nvidia.com", "tensorrt==9.0.1.post11.dev4", "--no-cache-dir"], check=True)
         except subprocess.CalledProcessError:
             error_packages.append("Failed to install TensorRT")
 
     # Install other required packages
     if not is_installed("polygraphy"):
         try:
-            subprocess.run(["pip", "install", "polygraphy==0.47.1", "--extra-index-url", "https://pypi.ngc.nvidia.com"], check=True)
+            subprocess.run([sys.executable, "-m", "pip", "install", "polygraphy==0.47.1", "--extra-index-url", "https://pypi.ngc.nvidia.com"], check=True)
         except subprocess.CalledProcessError:
             error_packages.append("Failed to install polygraphy")
     if not is_installed("onnx_graphsurgeon"):
         try:
-            subprocess.run(["pip", "install", "onnx-graphsurgeon==0.3.26", "--extra-index-url", "https://pypi.ngc.nvidia.com"], check=True)
+            subprocess.run([sys.executable, "-m", "pip", "install", "onnx-graphsurgeon==0.3.26", "--extra-index-url", "https://pypi.ngc.nvidia.com"], check=True)
         except subprocess.CalledProcessError:
             error_packages.append("Failed to install onnx-graphsurgeon")
     if platform.system() == 'Windows' and not is_installed("pywin32"):
         try:
-            subprocess.run(["pip", "install", "pywin32"], check=True)
+            subprocess.run([sys.executable, "-m", "pip", "install", "pywin32"], check=True)
         except subprocess.CalledProcessError:
             error_packages.append("Failed to install pywin32")
     try:
         import torch
         import tensorrt as trt
         print(trt)
+        print("All packages installed successfully! You need to restart webui.bat to apply changes.")
     except Exception as e:
         print(f"An unexpected error occurred while executing the command: {e}")
 
@@ -198,11 +207,22 @@ def inst_upd():
 
 def fix_pop():
     try:
-        subprocess.check_call(["pip", "uninstall", "-y", "nvidia-cudnn-cu11"])
+        subprocess.check_call([sys.executable, "-m", "pip", "uninstall", "-y", "nvidia-cudnn-cu11"])
         return 'Done. You need to restart webui.bat to apply changes.'
     except Exception as e:
         return f"An unexpected error occurred while executing the command: {e}"
+
+def re_download():
+    try:
+        shutil.rmtree(current_dir)
+        print(f"Folder '{current_dir}' successfully deleted.")
+    except OSError as e:
+        print(f"Error: {current_dir} : {e.strerror}")
     
+    git_fn("clone")
+
+
+        
 def check_version():
     url = 'https://api.github.com/repos/olegchomp/TouchDiffusion/releases/latest'
     try:
@@ -253,7 +273,6 @@ with gr.Blocks() as demo:
                                       sampling_steps_slider, acceleration_radio,
                                       model_dropdown, model_type], 
                               outputs=output)
-            #model_type.change(fn=update_interactivity, inputs=model_type, outputs=acceleration_radio)
             model_type.change(fn=update_interactivity, inputs=[model_type,sampling_steps_slider], outputs=[model_dropdown, acceleration_radio])
             sampling_steps_slider.change(fn=update_hypersd, inputs=[sampling_steps_slider,model_type], outputs=[acceleration_radio])
     
@@ -264,11 +283,14 @@ with gr.Blocks() as demo:
                 install_update = gr.Button("Update dependencies", variant='primary')
                 gr.Text("If you get pop up window with error, click 'fix pop up' button.", label='Additional step')
                 fix_popup = gr.Button("Fix pop up", variant='secondary')
+                gr.Text("This action will delete & download StreamDiffusion again.", label='Additional step')
+                redownload = gr.Button("Redownload", variant='secondary')
             with gr.Column(scale=1):
                 output = gr.Textbox(label="Output")
 
             install_update.click(fn=inst_upd, inputs=[], outputs=output)
             fix_popup.click(fn=fix_pop, inputs=[], outputs=output)
+            redownload.click(fn=re_download, inputs=[], outputs=output)
     with gr.Tab("About"):
         with gr.Row():
             with gr.Column(scale=1):
