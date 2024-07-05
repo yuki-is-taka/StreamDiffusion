@@ -145,6 +145,7 @@ class StreamDiffusion:
         
         weights = ['Hyper-SD15-1step-lora.safetensors',
         'Hyper-SD15-2steps-lora.safetensors',
+        '',
         'Hyper-SD15-4steps-lora.safetensors',
         'Hyper-SD15-8steps-lora.safetensors']
         # Hyper-SD15-8steps-CFG-lora.safetensors
