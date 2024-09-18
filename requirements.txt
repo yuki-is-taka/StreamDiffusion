@@ -2,7 +2,7 @@ setuptools==69.5.1
 fire
 omegaconf
 cuda-python
-diffusers==0.29.0
+diffusers
 transformers
 accelerate
 onnx==1.15.0
