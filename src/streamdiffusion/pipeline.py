@@ -40,8 +40,6 @@ class StreamDiffusion:
         self.latent_height = int(height // pipe.vae_scale_factor)
         self.latent_width = int(width // pipe.vae_scale_factor)
 
-        self.cfg_type = cfg_type
-
         self.CM_lora_type = CM_lora_type
 
         self.frame_bff_size = frame_buffer_size
@@ -56,9 +54,9 @@ class StreamDiffusion:
             if denoising_steps_num is not None:
                 print("num_denoising_steps is overwritten by the length of the provieded t_index_list")
             self.denoising_steps_num = len(t_index_list)
-        self.t_list = t_index_list
 
-        # Decide the unet batch size
+        self.cfg_type = cfg_type
+
         if use_denoising_batch:
             self.batch_size = self.denoising_steps_num * frame_buffer_size
             if self.cfg_type == "initialize":
@@ -75,7 +73,8 @@ class StreamDiffusion:
             self.trt_unet_batch_size = self.frame_bff_size
             self.batch_size = frame_buffer_size
 
-        # Image generation settings
+        self.t_list = t_index_list
+
         self.do_add_noise = do_add_noise
         self.use_denoising_batch = use_denoising_batch
 
@@ -83,10 +82,8 @@ class StreamDiffusion:
         self.similar_filter = SimilarImageFilter()
         self.prev_image_result = None
 
-        # Set pipeline components
         self.pipe = pipe
         self.image_processor = VaeImageProcessor(pipe.vae_scale_factor)
-        
 
         self.scheduler = LCMScheduler.from_config(self.pipe.scheduler.config)
         self.text_encoder = pipe.text_encoder
@@ -202,23 +199,6 @@ class StreamDiffusion:
             self.generator.seed()
         else:
             self.generator.manual_seed(seed)
-    
-    # def generate_t_index_list(
-    #         self,
-    #         noise_strength: float = 0.4,
-    #         num_inference_steps: int = 50,
-    #         mode: Literal['linear'] ='linear',
-    #         ) -> List[int]:
-    #     initial_t_index = int((num_inference_steps-1) * (1-noise_strength))
-    #     t_index_list = [initial_t_index]
-    #     if mode == 'linear':
-    #         t_index_interval = ((num_inference_steps-1) - initial_t_index) / (self.denoising_steps_num-1)
-    #         for idx in range(1, self.denoising_steps_num):
-    #             t_index = initial_t_index + int(idx * t_index_interval)
-    #             t_index_list.append(t_index)
-    #     else:
-    #         raise ValueError(f"Unsupported mode {mode}")
-    #     return t_index_list
 
     def generate_t_index_list(
         self,
@@ -334,7 +314,6 @@ class StreamDiffusion:
             .view(len(self.t_list), 1, 1, 1)
             .to(dtype=self.dtype, device=self.device)
         )
-
         self.alpha_prod_t_sqrt = torch.repeat_interleave(
             alpha_prod_t_sqrt,
             repeats=self.frame_bff_size if self.use_denoising_batch else 1,
@@ -510,6 +489,7 @@ class StreamDiffusion:
             denoised_batch = (
                 self.c_out[idx] * F_theta + self.c_skip[idx] * x_t_latent_batch
             )
+
         return denoised_batch
 
     def unet_step(
@@ -518,8 +498,6 @@ class StreamDiffusion:
         t_list: Union[torch.Tensor, list[int]],
         idx: Optional[int] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        
-        # TODO: Re-implement R-CFG according to the equation in the paper
         if self.cfg_type == "initialize":
             x_t_latent_plus_uc = torch.concat([x_t_latent[0:1], x_t_latent], dim=0)
             t_list = torch.concat([t_list[0:1], t_list], dim=0)
@@ -547,19 +525,17 @@ class StreamDiffusion:
             noise_pred_text = model_pred
         if self.cfg_type == "self" or self.cfg_type == "initialize":
             noise_pred_uncond = self.stock_noise * self.delta
-
         if self.guidance_scale > 1.0 and self.cfg_type != "none":
             model_pred = noise_pred_uncond + self.guidance_scale * (
                 noise_pred_text - noise_pred_uncond
             )
         else:
             model_pred = noise_pred_text
-        
+
         # compute the previous noisy sample x_t -> x_t-1
         if self.use_denoising_batch:
             denoised_batch = self.scheduler_step_batch(model_pred, x_t_latent, idx)
             if self.cfg_type == "self" or self.cfg_type == "initialize":
-                # TODO: Re-implement R-CFG
                 scaled_noise = self.beta_prod_t_sqrt * self.stock_noise
                 delta_x = self.scheduler_step_batch(model_pred, scaled_noise, idx)
                 alpha_next = torch.concat(
@@ -582,6 +558,7 @@ class StreamDiffusion:
                     [self.init_noise[1:], self.init_noise[0:1]], dim=0
                 )
                 self.stock_noise = init_noise + delta_x
+
         else:
             # denoised_batch = self.scheduler.step(model_pred, t_list[0], x_t_latent).denoised
             denoised_batch = self.scheduler_step_batch(model_pred, x_t_latent, idx)
@@ -611,12 +588,9 @@ class StreamDiffusion:
             t_list = self.sub_timesteps_tensor
             if self.denoising_steps_num > 1:
                 x_t_latent = torch.cat((x_t_latent, prev_latent_batch), dim=0)
-
-                # TODO: Re-implement R-CFG. The stock noise would be removed in the future
                 self.stock_noise = torch.cat(
                     (self.init_noise[0:1], self.stock_noise[:-1]), dim=0
                 )
-                
             x_0_pred_batch, model_pred = self.unet_step(x_t_latent, t_list)
 
             if self.denoising_steps_num > 1:
@@ -676,8 +650,7 @@ class StreamDiffusion:
 
     @torch.no_grad()
     def __call__(
-        self, 
-        x: Union[torch.Tensor, PIL.Image.Image, np.ndarray] = None,
+        self, x: Union[torch.Tensor, PIL.Image.Image, np.ndarray] = None,
         x_t_latent: Union[None, torch.Tensor] = None,
     ) -> torch.Tensor:
         start = torch.cuda.Event(enable_timing=True)
@@ -723,7 +696,6 @@ class StreamDiffusion:
         x_output = self.decode_image(x_0_pred_out).detach().clone()
         return x_output
 
-    @torch.no_grad()
     def txt2img_sd_turbo(self, batch_size: int = 1) -> torch.Tensor:
         x_t_latent = torch.randn(
             (batch_size, 4, self.latent_height, self.latent_width),

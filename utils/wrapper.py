@@ -373,7 +373,7 @@ class StreamDiffusionWrapper:
         acceleration: Literal["none", "xformers", "tensorrt"] = "tensorrt",
         warmup: int = 10,
         do_add_noise: bool = True,
-        use_lcm_lora: bool = False,
+        use_lcm_lora: bool = True,
         use_hyper_lora: bool = False,
         use_tiny_vae: bool = True,
         cfg_type: Literal["none", "full", "self", "initialize"] = "self",
@@ -491,8 +491,6 @@ class StreamDiffusionWrapper:
                     cache_dir=os.path.join(touchdiffusion_path, 'models/acceleration_loras'),
                     local_files_only=self.local_files_only
                 )
-            else:
-                pass
 
             if isinstance(lora_dict, dict):
                 for lora_name, lora_scale in lora_dict.items():
@@ -512,81 +510,84 @@ class StreamDiffusionWrapper:
                     device=pipe.device, dtype=pipe.dtype
                 )
 
-        if acceleration == "tensorrt":
-            from polygraphy import cuda
-            from streamdiffusion.acceleration.tensorrt import (
-                TorchVAEEncoder,
-                compile_unet,
-                compile_vae_decoder,
-                compile_vae_encoder,
-            )
-            from streamdiffusion.acceleration.tensorrt.engine import (
-                AutoencoderKLEngine,
-                UNet2DConditionModelEngine,
-            )
-            from streamdiffusion.acceleration.tensorrt.models import (
-                VAE,
-                UNet,
-                VAEEncoder,
-            )
+        try:
+            if acceleration == "xformers":
+                stream.pipe.enable_xformers_memory_efficient_attention()
+            if acceleration == "tensorrt":
+                from polygraphy import cuda
+                from streamdiffusion.acceleration.tensorrt import (
+                    TorchVAEEncoder,
+                    compile_unet,
+                    compile_vae_decoder,
+                    compile_vae_encoder,
+                )
+                from streamdiffusion.acceleration.tensorrt.engine import (
+                    AutoencoderKLEngine,
+                    UNet2DConditionModelEngine,
+                )
+                from streamdiffusion.acceleration.tensorrt.models import (
+                    VAE,
+                    UNet,
+                    VAEEncoder,
+                )
 
-            def create_prefix(
-                model_id_or_path: str,
-                max_batch_size: int,
-                min_batch_size: int,
-            ):
-                
-                if use_lcm_lora == True:
-                    acceleration_mode = 'LCM'
-                elif use_hyper_lora == True:
-                    acceleration_mode = 'HyperSD'
-                else:
-                    acceleration_mode = 'None'
+                def create_prefix(
+                    model_id_or_path: str,
+                    max_batch_size: int,
+                    min_batch_size: int,
+                ):
+                    
+                    if use_lcm_lora == True:
+                        acceleration_mode = 'LCM'
+                    elif use_hyper_lora == True:
+                        acceleration_mode = 'HyperSD'
+                    else:
+                        acceleration_mode = 'None'
 
-                maybe_path = Path(os.path.join(touchdiffusion_path, model_id_or_path))
-                if maybe_path.exists():
-                    return f"{maybe_path.stem}--{self.model_type}--{self.width}--{self.height}--{acceleration_mode}--{max_batch_size}--{min_batch_size}--{self.mode}--None--None"
-                else:
-                    return f"{model_id_or_path}--{self.model_type}--{self.width}--{self.height}--{acceleration_mode}--{max_batch_size}--{min_batch_size}--{self.mode}--None--None"
+                    maybe_path = Path(os.path.join(touchdiffusion_path, model_id_or_path))
+                    if maybe_path.exists():
+                        return f"{maybe_path.stem}--{self.model_type}--{self.width}--{self.height}--{acceleration_mode}--{max_batch_size}--{min_batch_size}--{self.mode}--None--None"
+                    else:
+                        return f"{model_id_or_path}--{self.model_type}--{self.width}--{self.height}--{acceleration_mode}--{max_batch_size}--{min_batch_size}--{self.mode}--None--None"
 
-            engine_dir = Path(engine_dir)
-            unet_path = os.path.join(
-                engine_dir,
-                create_prefix(
-                    model_id_or_path=model_id_or_path,
-                    max_batch_size=stream.trt_unet_batch_size,
-                    min_batch_size=stream.trt_unet_batch_size,
-                ),
-                "unet.engine",
-            )
-            vae_encoder_path = os.path.join(
-                engine_dir,
-                create_prefix(
-                    model_id_or_path=model_id_or_path,
-                    max_batch_size=self.batch_size
-                    if self.mode == "txt2img"
-                    else stream.frame_bff_size,
-                    min_batch_size=self.batch_size
-                    if self.mode == "txt2img"
-                    else stream.frame_bff_size,
-                ),
-                "vae_encoder.engine",
-            )
-            vae_decoder_path = os.path.join(
-                engine_dir,
-                create_prefix(
-                    model_id_or_path=model_id_or_path,
-                    max_batch_size=self.batch_size
-                    if self.mode == "txt2img"
-                    else stream.frame_bff_size,
-                    min_batch_size=self.batch_size
-                    if self.mode == "txt2img"
-                    else stream.frame_bff_size,
-                ),
-                "vae_decoder.engine",
-            )
+                engine_dir = Path(engine_dir)
+                unet_path = os.path.join(
+                    engine_dir,
+                    create_prefix(
+                        model_id_or_path=model_id_or_path,
+                        max_batch_size=stream.trt_unet_batch_size,
+                        min_batch_size=stream.trt_unet_batch_size,
+                    ),
+                    "unet.engine",
+                )
+                vae_encoder_path = os.path.join(
+                    engine_dir,
+                    create_prefix(
+                        model_id_or_path=model_id_or_path,
+                        max_batch_size=self.batch_size
+                        if self.mode == "txt2img"
+                        else stream.frame_bff_size,
+                        min_batch_size=self.batch_size
+                        if self.mode == "txt2img"
+                        else stream.frame_bff_size,
+                    ),
+                    "vae_encoder.engine",
+                )
+                vae_decoder_path = os.path.join(
+                    engine_dir,
+                    create_prefix(
+                        model_id_or_path=model_id_or_path,
+                        max_batch_size=self.batch_size
+                        if self.mode == "txt2img"
+                        else stream.frame_bff_size,
+                        min_batch_size=self.batch_size
+                        if self.mode == "txt2img"
+                        else stream.frame_bff_size,
+                    ),
+                    "vae_decoder.engine",
+                )
 
-            if touchdiffusion != True:
+                #if touchdiffusion != True:
                 if not os.path.exists(unet_path):
                     os.makedirs(os.path.dirname(unet_path), exist_ok=True)
                     unet_model = UNet(
@@ -659,28 +660,38 @@ class StreamDiffusionWrapper:
                         else stream.frame_bff_size,
                     )
 
-            cuda_stream = cuda.Stream()
+                cuda_stream = cuda.Stream()
 
-            vae_config = stream.vae.config
-            vae_dtype = stream.vae.dtype
+                vae_config = stream.vae.config
+                vae_dtype = stream.vae.dtype
 
-            stream.unet = UNet2DConditionModelEngine(
-                unet_path, cuda_stream, use_cuda_graph=False
-            )
-            stream.vae = AutoencoderKLEngine(
-                vae_encoder_path,
-                vae_decoder_path,
-                cuda_stream,
-                stream.pipe.vae_scale_factor,
-                use_cuda_graph=False,
-            )
-            setattr(stream.vae, "config", vae_config)
-            setattr(stream.vae, "dtype", vae_dtype)
+                stream.unet = UNet2DConditionModelEngine(
+                    unet_path, cuda_stream, use_cuda_graph=False
+                )
+                stream.vae = AutoencoderKLEngine(
+                    vae_encoder_path,
+                    vae_decoder_path,
+                    cuda_stream,
+                    stream.pipe.vae_scale_factor,
+                    use_cuda_graph=False,
+                )
+                setattr(stream.vae, "config", vae_config)
+                setattr(stream.vae, "dtype", vae_dtype)
 
-            gc.collect()
-            torch.cuda.empty_cache()
+                gc.collect()
+                torch.cuda.empty_cache()
 
-            print("TensorRT acceleration enabled.")
+                print("TensorRT acceleration enabled.")
+            if acceleration == "sfast":
+                from streamdiffusion.acceleration.sfast import (
+                    accelerate_with_stable_fast,
+                )
+
+                stream = accelerate_with_stable_fast(stream)
+                print("StableFast acceleration enabled.")
+        except Exception:
+            traceback.print_exc()
+            print("Acceleration has failed. Falling back to normal mode.")
 
         if seed < 0: # Random seed
             seed = np.random.randint(0, 1000000)
