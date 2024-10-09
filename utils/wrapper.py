@@ -26,7 +26,7 @@ class StreamDiffusionWrapper:
         t_index_list: List[int],
         lora_dict: Optional[Dict[str, float]] = None,
         mode: Literal["img2img", "txt2img"] = "img2img",
-        output_type: Literal["pil", "pt", "np", "latent"] = "pt",
+        output_type: Literal["pil", "pt", "np", "latent"] = "pil",
         lcm_lora_id: Optional[str] = None,
         vae_id: Optional[str] = None,
         device: Literal["cpu", "cuda"] = "cuda",
@@ -187,26 +187,6 @@ class StreamDiffusionWrapper:
         if enable_similar_image_filter:
             self.stream.enable_similar_image_filter(similar_image_filter_threshold, similar_image_filter_max_skip_frame)
 
-
-    def touchdiffusion_prompt(self, prompt):
-        self.stream.update_prompt(prompt)
-        #self.stream.update_prompt_weight(prompt)
-
-    def touchdiffusion_scheduler(self, t_index_list):
-        self.stream.update_scheduler(t_index_list=t_index_list)
-    
-    def touchdiffusion_generate_t_index_list(self, noise_strength, mode):
-        t_index_list = self.stream.generate_t_index_list(noise_strength=noise_strength, mode=mode)
-        self.stream.update_scheduler(t_index_list=t_index_list)
-    
-    def touchdiffusion_update_cfg_setting(self,guidance_scale, delta):
-        self.stream.update_cfg_setting(guidance_scale=guidance_scale, delta=delta)
-        #self.stream.update_noise()
-
-    def touchdiffusion_update_noise(self, seed):
-        self.stream.init_generator(seed)
-        self.stream.update_noise()
-
     def prepare(
         self,
         prompt: str,
@@ -215,7 +195,6 @@ class StreamDiffusionWrapper:
         guidance_scale: float = 1.2,
         delta: float = 1.0,
         t_index_list: List[int] = 1
-        
     ) -> None:
         """
         Prepares the model for inference.
@@ -328,6 +307,16 @@ class StreamDiffusionWrapper:
         image_tensor = self.stream(image)
         image = self.postprocess_image(image_tensor, output_type=self.output_type)
 
+        if self.use_safety_checker:
+            safety_checker_input = self.feature_extractor(
+                image, return_tensors="pt"
+            ).to(self.device)
+            _, has_nsfw_concept = self.safety_checker(
+                images=image_tensor.to(self.dtype),
+                clip_input=safety_checker_input.pixel_values.to(self.dtype),
+            )
+            image = self.nsfw_fallback_img if has_nsfw_concept[0] else image
+
         return image
 
     def preprocess_image(self, image: Union[str, Image.Image]) -> torch.Tensor:
@@ -344,22 +333,17 @@ class StreamDiffusionWrapper:
         torch.Tensor
             The preprocessed image.
         """
-        if isinstance(image, torch.Tensor):
-            return self.stream.image_processor.preprocess(
-                image, self.height, self.width
-                ).to(device=self.device, dtype=self.dtype)
-        else:
-            if isinstance(image, str):
-                image = Image.open(image).convert("RGB").resize((self.width, self.height))
-            if isinstance(image, Image.Image):
-                image = image.convert("RGB").resize((self.width, self.height))
-            
-            return self.stream.image_processor.preprocess(
-                image, self.height, self.width
-            ).to(device=self.device, dtype=self.dtype)
+        if isinstance(image, str):
+            image = Image.open(image).convert("RGB").resize((self.width, self.height))
+        if isinstance(image, Image.Image):
+            image = image.convert("RGB").resize((self.width, self.height))
+
+        return self.stream.image_processor.preprocess(
+            image, self.height, self.width
+        ).to(device=self.device, dtype=self.dtype)
 
     def postprocess_image(
-        self, image_tensor: torch.Tensor, output_type: str = "pt"
+        self, image_tensor: torch.Tensor, output_type: str = "pil"
     ) -> Union[Image.Image, List[Image.Image], torch.Tensor, np.ndarray]:
         """
         Postprocesses the image.
@@ -613,8 +597,6 @@ class StreamDiffusionWrapper:
                         embedding_dim=stream.text_encoder.config.hidden_size,
                         unet_dim=stream.unet.config.in_channels,
                     )
-
-                    print(self.height)
                     compile_unet(
                         stream.unet,
                         unet_model,
@@ -714,5 +696,19 @@ class StreamDiffusionWrapper:
             generator=torch.Generator(),
             seed=seed,
         )
+
+        if self.use_safety_checker:
+            from transformers import CLIPFeatureExtractor
+            from diffusers.pipelines.stable_diffusion.safety_checker import (
+                StableDiffusionSafetyChecker,
+            )
+
+            self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
+                "CompVis/stable-diffusion-safety-checker"
+            ).to(pipe.device)
+            self.feature_extractor = CLIPFeatureExtractor.from_pretrained(
+                "openai/clip-vit-base-patch32"
+            )
+            self.nsfw_fallback_img = Image.new("RGB", (512, 512), (0, 0, 0))
 
         return stream
