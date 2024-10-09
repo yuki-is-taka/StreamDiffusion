@@ -291,15 +291,15 @@ class StreamDiffusionWrapper:
             image_tensor = self.stream.txt2img(self.frame_buffer_size)
         image = self.postprocess_image(image_tensor, output_type=self.output_type)
 
-        # if self.use_safety_checker:
-        #     safety_checker_input = self.feature_extractor(
-        #         image, return_tensors="pt"
-        #     ).to(self.device)
-        #     _, has_nsfw_concept = self.safety_checker(
-        #         images=image_tensor.to(self.dtype),
-        #         clip_input=safety_checker_input.pixel_values.to(self.dtype),
-        #     )
-        #     image = self.nsfw_fallback_img if has_nsfw_concept[0] else image
+        if self.use_safety_checker:
+            safety_checker_input = self.feature_extractor(
+                image, return_tensors="pt"
+            ).to(self.device)
+            _, has_nsfw_concept = self.safety_checker(
+                images=image_tensor.to(self.dtype),
+                clip_input=safety_checker_input.pixel_values.to(self.dtype),
+            )
+            image = self.nsfw_fallback_img if has_nsfw_concept[0] else image
 
         return image
 
