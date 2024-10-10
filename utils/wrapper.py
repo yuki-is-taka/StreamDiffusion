@@ -440,8 +440,8 @@ class StreamDiffusionWrapper:
                         local_files_only=self.local_files_only,
                         torch_dtype = torch.float16,
                         variant="fp16",
-                        add_watermarker=False,
-                        safety_checker=None
+                        add_watermarker=False
+                        #safety_checker=None
                     ).to(device=self.device, dtype=self.dtype)
             elif self.model_type == 'sd_1.5_turbo':
                 pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_pretrained(
@@ -452,8 +452,8 @@ class StreamDiffusionWrapper:
                     local_files_only=self.local_files_only,
                     torch_dtype = torch.float16,
                     variant="fp16",
-                    add_watermarker=False,
-                    safety_checker=None
+                    add_watermarker=False
+                    #safety_checker=None
                 ).to(device=self.device, dtype=self.dtype)
         except Exception as e:  # No model found
             #traceback.print_exc()

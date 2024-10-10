@@ -149,7 +149,6 @@ class StreamDiffusion:
         # Hyper-SD15-12steps-CFG-lora.safetensors
 
         selected_weight = weights[self.denoising_steps_num-1]
-        print(selected_weight)
 
         self.pipe.load_lora_weights(
             pretrained_model_name_or_path_or_dict, 
@@ -340,7 +339,7 @@ class StreamDiffusion:
             and self.previous_negative_prompt == negative_prompt 
         ):
             return
-        print('new prompt')
+
         if negative_prompt is None:
             encoder_output = self.pipe.encode_prompt(
                 prompt=prompt,
